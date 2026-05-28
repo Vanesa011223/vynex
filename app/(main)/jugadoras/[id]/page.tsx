@@ -1,15 +1,20 @@
 import { prisma } from '@/lib/prisma'
-import { calcRating, ratingColor, pct } from '@/lib/stats'
+import { calcRating, ratingColor, ratingBg, pct, calcInjuryRisk, riskConfig } from '@/lib/stats'
 import { notFound } from 'next/navigation'
 import { verifySession } from '@/lib/dal'
 import PlayerRadarChart from '@/components/PlayerRadarChart'
 import PhysicalDataForm from './PhysicalDataForm'
 import Link from 'next/link'
+import { ShieldAlert } from 'lucide-react'
 
 export default async function JugadoraPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifySession()
   const { id } = await params
   const isAdmin = session.role === 'ADMIN' || session.role === 'COACH'
+
+  const now = new Date()
+  const days60ago = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+  const days28ago = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000)
 
   const player = await prisma.user.findUnique({
     where: { id },
@@ -19,6 +24,7 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
         include: { match: true },
         orderBy: { match: { date: 'desc' } },
       },
+      injuries: { orderBy: { startDate: 'desc' } },
     },
   })
 
@@ -47,6 +53,39 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
   const rating = calcRating(totals)
   const partidos = player.matchStats.length
 
+  // Contextual ratings per match
+  const matchRatings = player.matchStats.map(s => calcRating(s))
+  const avgRating = matchRatings.length > 0
+    ? Math.round(matchRatings.reduce((a, b) => a + b, 0) / matchRatings.length)
+    : 0
+
+  // Last 5 matches form
+  const last5 = matchRatings.slice(0, 5)
+
+  // Injury risk calculation (admin only)
+  const hasCurrentInjury = player.injuries.some(i => !i.endDate)
+  const minutesLast4Weeks = player.matchStats
+    .filter(s => new Date(s.match.date) >= days28ago)
+    .reduce((sum, s) => sum + s.minutes, 0)
+  const avgMinutesPerMatch = partidos > 0 ? totals.minutes / partidos : 0
+  const recentInjuryCount = player.injuries.filter(i => new Date(i.startDate) >= days60ago).length
+
+  // Consecutive matches with >80 min (from most recent)
+  let consecutiveHighMinutes = 0
+  for (const s of player.matchStats) {
+    if (s.minutes > 80) consecutiveHighMinutes++
+    else break
+  }
+
+  const injuryRisk = calcInjuryRisk({
+    hasCurrentInjury,
+    matchCount: partidos,
+    minutesLast4Weeks,
+    avgMinutesPerMatch,
+    consecutiveHighMinutes,
+    recentInjuryCount,
+  })
+
   const statRows = [
     { label: 'Pases', ok: totals.passesOk, fail: totals.passesFail },
     { label: 'Tiros', ok: totals.shotsOk, fail: totals.shotsFail },
@@ -55,9 +94,18 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
     { label: 'Recuperaciones', ok: totals.recovOk, fail: totals.recovFail },
   ]
 
+  function trendIndicator(matchR: number, avg: number) {
+    if (avg === 0 || matchR === 0) return null
+    const diff = matchR - avg
+    if (diff >= 8) return { label: '↑ Destacada', color: 'text-emerald-400 bg-emerald-500/10' }
+    if (diff >= 3) return { label: '↑', color: 'text-emerald-400' }
+    if (diff <= -8) return { label: '↓ Bajo nivel', color: 'text-red-400 bg-red-500/10' }
+    if (diff <= -3) return { label: '↓', color: 'text-red-400' }
+    return { label: '=', color: 'text-slate-400' }
+  }
+
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
-      {/* Back */}
       <Link href="/jugadoras" className="text-slate-400 hover:text-white text-sm flex items-center gap-1">
         ← Volver
       </Link>
@@ -75,10 +123,23 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
             {isAdmin && player.dominantFoot && (
               <p className="text-slate-500 text-sm">Pierna: {player.dominantFoot}</p>
             )}
+            {/* Last 5 form dots */}
+            {last5.length > 0 && (
+              <div className="flex items-center gap-1.5 mt-2">
+                <span className="text-xs text-slate-500 mr-1">Forma:</span>
+                {last5.map((r, i) => (
+                  <div
+                    key={i}
+                    title={r > 0 ? String(r) : 'Sin datos'}
+                    className={`w-3 h-3 rounded-full ${r > 0 ? ratingBg(r) : 'bg-slate-700'}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
           <div className="text-right">
             <div className={`text-5xl font-black ${ratingColor(rating)}`}>{rating || '—'}</div>
-            <p className="text-slate-400 text-xs mt-1">Valoración</p>
+            <p className="text-slate-400 text-xs mt-1">Valoración media</p>
           </div>
         </div>
 
@@ -124,6 +185,49 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
         )}
       </div>
 
+      {/* Injury Risk — admin only */}
+      {isAdmin && partidos >= 3 && (
+        <div className={`border rounded-2xl p-5 ${riskConfig[injuryRisk.level].bg}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldAlert size={18} className={riskConfig[injuryRisk.level].color} />
+              <span className="font-semibold text-white text-sm">Riesgo de Lesión</span>
+            </div>
+            <span className={`text-lg font-bold ${riskConfig[injuryRisk.level].color}`}>
+              {riskConfig[injuryRisk.level].label}
+            </span>
+          </div>
+          <div className="mt-3 space-y-1">
+            {injuryRisk.factors.map((f, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm text-slate-300">
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                  injuryRisk.level === 'bajo' ? 'bg-emerald-400' :
+                  injuryRisk.level === 'moderado' ? 'bg-yellow-400' :
+                  injuryRisk.level === 'alto' ? 'bg-orange-400' : 'bg-red-400'
+                }`} />
+                {f}
+              </div>
+            ))}
+          </div>
+          {partidos > 0 && (
+            <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-center">
+              <div className="bg-slate-900/40 rounded-lg p-2">
+                <div className="text-white font-semibold">{minutesLast4Weeks}</div>
+                <div className="text-slate-400">Min. (4 semanas)</div>
+              </div>
+              <div className="bg-slate-900/40 rounded-lg p-2">
+                <div className="text-white font-semibold">{Math.round(avgMinutesPerMatch)}</div>
+                <div className="text-slate-400">Media min/partido</div>
+              </div>
+              <div className="bg-slate-900/40 rounded-lg p-2">
+                <div className="text-white font-semibold">{consecutiveHighMinutes}</div>
+                <div className="text-slate-400">Consec. &gt;80 min</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Radar chart */}
       <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
         <h2 className="font-semibold text-white mb-4">Perfil de rendimiento</h2>
@@ -142,10 +246,7 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
               <div key={label} className="flex items-center gap-4 px-4 py-3">
                 <span className="text-slate-300 text-sm w-32 flex-shrink-0">{label}</span>
                 <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-emerald-500 rounded-full transition-all"
-                    style={{ width: `${p ?? 0}%` }}
-                  />
+                  <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${p ?? 0}%` }} />
                 </div>
                 <span className="text-white text-sm font-medium w-10 text-right">{p !== null ? `${p}%` : '—'}</span>
                 <span className="text-slate-500 text-xs w-16 text-right">{ok + fail} acciones</span>
@@ -155,16 +256,21 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      {/* Match by match */}
+      {/* Match by match — with contextual ratings */}
       <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
-        <div className="p-4 border-b border-slate-800">
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
           <h2 className="font-semibold text-white">Partidos</h2>
+          {avgRating > 0 && (
+            <span className="text-xs text-slate-400">Media temporada: <span className={`font-bold ${ratingColor(avgRating)}`}>{avgRating}</span></span>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-800">
                 <th className="text-left text-slate-400 font-medium px-4 py-2">Rival</th>
+                <th className="text-center text-slate-400 font-medium px-2 py-2">Val.</th>
+                <th className="text-center text-slate-400 font-medium px-2 py-2">vs media</th>
                 <th className="text-center text-slate-400 font-medium px-2 py-2">Min</th>
                 <th className="text-center text-slate-400 font-medium px-2 py-2">Pases%</th>
                 <th className="text-center text-slate-400 font-medium px-2 py-2">Tiros%</th>
@@ -173,27 +279,41 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {player.matchStats.map((s) => (
-                <tr key={s.id} className="hover:bg-slate-800/50 transition-colors">
-                  <td className="px-4 py-3 text-white">{s.match.rival}</td>
-                  <td className="px-2 py-3 text-center text-slate-300">{s.minutes || '—'}</td>
-                  <td className="px-2 py-3 text-center">
-                    <span className={pct(s.passesOk, s.passesFail) !== null ? 'text-white' : 'text-slate-500'}>
+              {player.matchStats.map((s, i) => {
+                const r = matchRatings[i]
+                const trend = trendIndicator(r, avgRating)
+                return (
+                  <tr key={s.id} className="hover:bg-slate-800/50 transition-colors">
+                    <td className="px-4 py-3">
+                      <Link href={`/partidos/${s.matchId}`} className="text-white hover:text-emerald-400 transition-colors">
+                        {s.match.rival}
+                      </Link>
+                    </td>
+                    <td className={`px-2 py-3 text-center font-bold ${r > 0 ? ratingColor(r) : 'text-slate-500'}`}>
+                      {r > 0 ? r : '—'}
+                    </td>
+                    <td className="px-2 py-3 text-center">
+                      {trend ? (
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${trend.color}`}>
+                          {trend.label}
+                        </span>
+                      ) : <span className="text-slate-600">—</span>}
+                    </td>
+                    <td className="px-2 py-3 text-center text-slate-300">{s.minutes || '—'}</td>
+                    <td className="px-2 py-3 text-center text-slate-300">
                       {pct(s.passesOk, s.passesFail) !== null ? `${pct(s.passesOk, s.passesFail)}%` : '—'}
-                    </span>
-                  </td>
-                  <td className="px-2 py-3 text-center">
-                    <span className={pct(s.shotsOk, s.shotsFail) !== null ? 'text-white' : 'text-slate-500'}>
+                    </td>
+                    <td className="px-2 py-3 text-center text-slate-300">
                       {pct(s.shotsOk, s.shotsFail) !== null ? `${pct(s.shotsOk, s.shotsFail)}%` : '—'}
-                    </span>
-                  </td>
-                  <td className="px-2 py-3 text-center text-emerald-400 font-medium">{s.goals || '—'}</td>
-                  <td className="px-2 py-3 text-center text-yellow-400">{s.assists || '—'}</td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-2 py-3 text-center text-emerald-400 font-medium">{s.goals || '—'}</td>
+                    <td className="px-2 py-3 text-center text-yellow-400">{s.assists || '—'}</td>
+                  </tr>
+                )
+              })}
               {player.matchStats.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">Sin datos de partidos</td>
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">Sin datos de partidos</td>
                 </tr>
               )}
             </tbody>

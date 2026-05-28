@@ -81,6 +81,47 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
+      {/* MVP del partido */}
+      {match.playerStats.length > 0 && (() => {
+        const withRating = match.playerStats
+          .map(s => ({ ...s, r: calcRating(s) }))
+          .filter(s => s.r > 0)
+          .sort((a, b) => {
+            if (b.r !== a.r) return b.r - a.r
+            if (b.goals !== a.goals) return b.goals - a.goals
+            return b.assists - a.assists
+          })
+        const mvp = withRating[0]
+        if (!mvp) return null
+        return (
+          <div className="bg-gradient-to-r from-yellow-500/10 to-amber-500/5 border border-yellow-500/30 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-lg">⭐</span>
+              <span className="font-semibold text-yellow-400 text-sm uppercase tracking-wide">MVP del Partido</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center text-xl font-black text-yellow-400 flex-shrink-0">
+                {mvp.player.name.charAt(0)}
+              </div>
+              <div className="flex-1">
+                <Link href={`/jugadoras/${mvp.playerId}`} className="text-white font-bold text-lg hover:text-yellow-400 transition-colors">
+                  {mvp.player.name}
+                </Link>
+                <p className="text-slate-400 text-sm">{mvp.player.position ?? ''}</p>
+              </div>
+              <div className="text-right">
+                <div className={`text-4xl font-black ${ratingColor(mvp.r)}`}>{mvp.r}</div>
+                <div className="flex items-center gap-3 mt-1 justify-end text-sm">
+                  {mvp.goals > 0 && <span className="text-emerald-400">⚽ {mvp.goals}</span>}
+                  {mvp.assists > 0 && <span className="text-yellow-400">🎯 {mvp.assists}</span>}
+                  <span className="text-slate-400">{mvp.minutes} min</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Player stats table */}
       <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
         <div className="p-4 border-b border-slate-800">
