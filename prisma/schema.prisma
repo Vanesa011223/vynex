@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  password     String
+  role         String    @default("PLAYER")
+  number       Int?
+  position     String?
+  active       Boolean   @default(true)
+  birthDate    DateTime?
+  height       Float?
+  weight       Float?
+  dominantFoot String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  matchStats  PlayerMatchStats[]
+  attendances Attendance[]
+  injuries    Injury[]
+}
+
+model Match {
+  id        String   @id @default(cuid())
+  rival     String
+  date      DateTime @default(now())
+  location  String?
+  result    String?
+  isHome    Boolean  @default(true)
+  veoUrl    String?
+  createdAt DateTime @default(now())
+
+  playerStats PlayerMatchStats[]
+  analysis    MatchAnalysis?
+}
+
+model PlayerMatchStats {
+  id           String @id @default(cuid())
+  matchId      String
+  playerId     String
+  half         String @default("total")
+
+  minutes      Int    @default(0)
+  passesOk     Int    @default(0)
+  passesFail   Int    @default(0)
+  shotsOk      Int    @default(0)
+  shotsFail    Int    @default(0)
+  dribblesOk   Int    @default(0)
+  dribblesFail Int    @default(0)
+  duelsOk      Int    @default(0)
+  duelsFail    Int    @default(0)
+  recovOk      Int    @default(0)
+  recovFail    Int    @default(0)
+  losses       Int    @default(0)
+  offside      Int    @default(0)
+  goals        Int    @default(0)
+  assists      Int    @default(0)
+  km           Float?
+
+  match  Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player User  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId, half])
+}
+
+model Attendance {
+  id       String   @id @default(cuid())
+  playerId String
+  date     DateTime
+  type     String
+  note     String?
+
+  player User @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model Injury {
+  id        String    @id @default(cuid())
+  playerId  String
+  startDate DateTime
+  endDate   DateTime?
+  type      String
+  notes     String?
+
+  player User @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model TeamContext {
+  id           String   @id @default("singleton")
+  teamName     String   @default("Mi equipo")
+  season       String   @default("2025/26")
+  competition  String   @default("")
+  playingStyle String   @default("")
+  weekMessage  String   @default("")
+  updatedAt    DateTime @updatedAt
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model CalendarEvent {
+  id         String   @id @default(cuid())
+  date       DateTime
+  type       String
+  title      String
+  objectives String?
+  notes      String?
+  createdAt  DateTime @default(now())
+}
+
+model MatchAnalysis {
+  id         String   @id @default(cuid())
+  matchId    String   @unique
+  notes      String?
+  aiAnalysis String?
+  updatedAt  DateTime @updatedAt
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+}
