@@ -1,7 +1,7 @@
 ﻿'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, Trophy, Settings, LogOut, Calendar, Bot } from 'lucide-react'
+import { LayoutDashboard, Users, Trophy, Settings, LogOut, Calendar, Bot, Target, Dumbbell, BookOpen } from 'lucide-react'
 import { logout } from '@/app/actions/auth'
 
 const publicLinks = [
@@ -13,6 +13,9 @@ const publicLinks = [
 
 const adminLinks = [
   { href: '/vaynex', label: 'Vaynex', icon: Bot },
+  { href: '/rivales', label: 'Rivales', icon: Target },
+  { href: '/entrenamientos', label: 'Entrenos', icon: Dumbbell },
+  { href: '/ejercicios', label: 'Ejercicios', icon: BookOpen },
   { href: '/admin', label: 'Admin', icon: Settings },
 ]
 

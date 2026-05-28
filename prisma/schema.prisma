@@ -128,3 +128,50 @@ model MatchAnalysis {
 
   match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
 }
+
+model Rival {
+  id            String   @id @default(cuid())
+  name          String
+  competition   String?
+  strengths     String?
+  weaknesses    String?
+  opportunities String?
+  threats       String?
+  notes         String?
+  aiAnalysis    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Exercise {
+  id          String   @id @default(cuid())
+  name        String
+  category    String
+  description String?
+  objectives  String?
+  duration    Int?
+  difficulty  String?
+  materials   String?
+  createdAt   DateTime @default(now())
+}
+
+model TrainingPlan {
+  id         String            @id @default(cuid())
+  weekStart  DateTime
+  objectives String?
+  aiPlan     String?
+  sessions   TrainingSession[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+}
+
+model TrainingSession {
+  id          String       @id @default(cuid())
+  planId      String
+  dayOfWeek   Int
+  title       String
+  sessionType String
+  duration    Int?
+  notes       String?
+  plan        TrainingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+}
