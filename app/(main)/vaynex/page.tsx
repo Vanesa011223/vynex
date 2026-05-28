@@ -1,8 +1,9 @@
 ﻿import { verifyAdmin } from '@/lib/dal'
 import { prisma } from '@/lib/prisma'
-import VAYNEXChat from './VAYNEXChat'
+import VaynexChat from './VaynexChat'
 
-export default async function VAYNEXPage() {
+
+export default async function VaynexPage() {
   await verifyAdmin()
 
   const [messages, teamContext] = await Promise.all([
@@ -12,7 +13,7 @@ export default async function VAYNEXPage() {
 
   return (
     <div className="h-[calc(100vh-4rem)] md:h-screen md:pt-16 overflow-hidden">
-      <VAYNEXChat
+      <VaynexChat
         initialMessages={messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))}
         teamContext={teamContext}
       />
