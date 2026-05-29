@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { verifySession } from '@/lib/dal'
 import PlayerRadarChart from '@/components/PlayerRadarChart'
 import PhysicalDataForm from './PhysicalDataForm'
+import PlayerClips from './PlayerClips'
 import Link from 'next/link'
 import { ShieldAlert } from 'lucide-react'
 
@@ -25,6 +26,7 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
         orderBy: { match: { date: 'desc' } },
       },
       injuries: { orderBy: { startDate: 'desc' } },
+      clips: { orderBy: { createdAt: 'desc' } },
     },
   })
 
@@ -320,6 +322,19 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
           </table>
         </div>
       </div>
+
+      {/* Video clips */}
+      <PlayerClips
+        clips={player.clips.map(c => ({
+          id: c.id,
+          title: c.title,
+          url: c.url,
+          description: c.description,
+          createdAt: c.createdAt.toISOString(),
+        }))}
+        playerId={player.id}
+        isAdmin={isAdmin}
+      />
 
       {/* Physical data form — admin only */}
       {isAdmin && (

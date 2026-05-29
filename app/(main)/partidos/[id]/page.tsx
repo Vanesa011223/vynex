@@ -4,6 +4,7 @@ import { verifySession } from '@/lib/dal'
 import { calcRating, ratingColor, pct } from '@/lib/stats'
 import Link from 'next/link'
 import AnalysisPanel from './AnalysisPanel'
+import PitchLineup from '@/components/PitchLineup'
 
 export default async function PartidoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifySession()
@@ -174,6 +175,29 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
           </table>
         </div>
       </div>
+
+      {/* Pitch lineup */}
+      {match.playerStats.length > 0 && (
+        <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+          <div className="p-4 border-b border-slate-800">
+            <h2 className="font-semibold text-white">Alineación del partido</h2>
+          </div>
+          <div className="p-4">
+            <PitchLineup
+              players={match.playerStats
+                .filter(s => s.minutes > 0)
+                .map(s => ({
+                  id: s.playerId,
+                  name: s.player.name,
+                  position: s.player.position,
+                  rating: calcRating(s),
+                  goals: s.goals,
+                  minutes: s.minutes,
+                }))}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Analysis — admin only */}
       {isAdmin && (

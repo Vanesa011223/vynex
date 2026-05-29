@@ -26,6 +26,7 @@ model User {
   matchStats  PlayerMatchStats[]
   attendances Attendance[]
   injuries    Injury[]
+  clips       PlayerClip[]
 }
 
 model Match {
@@ -174,4 +175,16 @@ model TrainingSession {
   duration    Int?
   notes       String?
   plan        TrainingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+}
+
+model PlayerClip {
+  id          String   @id @default(cuid())
+  playerId    String
+  title       String
+  url         String
+  description String?
+  matchId     String?
+  createdAt   DateTime @default(now())
+
+  player User @relation(fields: [playerId], references: [id], onDelete: Cascade)
 }
