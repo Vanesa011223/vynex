@@ -37,6 +37,21 @@ export function ratingBg(r: number): string {
   return 'bg-red-500'
 }
 
+export function parseResult(result: string | null): 'win' | 'draw' | 'loss' | null {
+  if (!result) return null
+  const parts = result.split('-').map(s => parseInt(s.trim()))
+  if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return null
+  if (parts[0] > parts[1]) return 'win'
+  if (parts[0] === parts[1]) return 'draw'
+  return 'loss'
+}
+
+export const resultConfig = {
+  win:  { label: 'V', bg: 'bg-emerald-500/20', border: 'border-emerald-500/40', text: 'text-emerald-400', dot: 'bg-emerald-500' },
+  draw: { label: 'E', bg: 'bg-slate-500/20',   border: 'border-slate-500/40',   text: 'text-slate-400',   dot: 'bg-slate-500'  },
+  loss: { label: 'D', bg: 'bg-red-500/20',      border: 'border-red-500/40',     text: 'text-red-400',     dot: 'bg-red-500'    },
+}
+
 export type RiskLevel = 'bajo' | 'moderado' | 'alto' | 'muy_alto'
 
 export const riskConfig: Record<RiskLevel, { label: string; color: string; bg: string }> = {
