@@ -1,7 +1,7 @@
 ﻿'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, Trophy, Settings, LogOut, Calendar, Bot, Target, Dumbbell, BookOpen, BarChart2 } from 'lucide-react'
+import { LayoutDashboard, Users, Trophy, Settings, LogOut, Calendar, Bot, Target, Dumbbell, BookOpen, BarChart2, Bell, Euro } from 'lucide-react'
 import { logout } from '@/app/actions/auth'
 
 const publicLinks = [
@@ -9,6 +9,7 @@ const publicLinks = [
   { href: '/jugadoras', label: 'Jugadoras', icon: Users },
   { href: '/partidos', label: 'Partidos', icon: Trophy },
   { href: '/calendario', label: 'Calendario', icon: Calendar },
+  { href: '/avisos', label: 'Avisos', icon: Bell },
   { href: '/estadisticas', label: 'Stats', icon: BarChart2 },
 ]
 
@@ -17,6 +18,7 @@ const adminLinks = [
   { href: '/rivales', label: 'Rivales', icon: Target },
   { href: '/entrenamientos', label: 'Entrenos', icon: Dumbbell },
   { href: '/ejercicios', label: 'Ejercicios', icon: BookOpen },
+  { href: '/admin/multas', label: 'Multas', icon: Euro },
   { href: '/admin', label: 'Admin', icon: Settings },
 ]
 

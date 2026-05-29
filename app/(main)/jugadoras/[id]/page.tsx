@@ -5,6 +5,7 @@ import { verifySession } from '@/lib/dal'
 import PlayerRadarChart from '@/components/PlayerRadarChart'
 import PhysicalDataForm from './PhysicalDataForm'
 import PlayerClips from './PlayerClips'
+import PrintButton from '@/components/PrintButton'
 import Link from 'next/link'
 import { ShieldAlert } from 'lucide-react'
 
@@ -108,9 +109,12 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
-      <Link href="/jugadoras" className="text-slate-400 hover:text-white text-sm flex items-center gap-1">
-        ← Volver
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href="/jugadoras" className="text-slate-400 hover:text-white text-sm flex items-center gap-1">
+          ← Volver
+        </Link>
+        <PrintButton />
+      </div>
 
       {/* Header */}
       <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">

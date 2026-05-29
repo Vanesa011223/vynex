@@ -5,23 +5,30 @@ import { calcRating, ratingColor, pct } from '@/lib/stats'
 import Link from 'next/link'
 import AnalysisPanel from './AnalysisPanel'
 import PitchLineup from '@/components/PitchLineup'
+import ConvocatoriaPanel from './ConvocatoriaPanel'
 
 export default async function PartidoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifySession()
   const { id } = await params
   const isAdmin = session.role === 'ADMIN' || session.role === 'COACH'
 
-  const match = await prisma.match.findUnique({
-    where: { id },
-    include: {
-      playerStats: {
-        where: { half: 'total' },
-        include: { player: true },
-        orderBy: { player: { name: 'asc' } },
+  const [match, allPlayers] = await Promise.all([
+    prisma.match.findUnique({
+      where: { id },
+      include: {
+        playerStats: {
+          where: { half: 'total' },
+          include: { player: true },
+          orderBy: { player: { name: 'asc' } },
+        },
+        analysis: true,
+        convocatorias: true,
       },
-      analysis: true,
-    },
-  })
+    }),
+    isAdmin
+      ? prisma.user.findMany({ where: { role: 'PLAYER', active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, position: true } })
+      : Promise.resolve([]),
+  ])
 
   if (!match) notFound()
 
@@ -197,6 +204,19 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
             />
           </div>
         </div>
+      )}
+
+      {/* Convocatoria — admin only */}
+      {isAdmin && allPlayers.length > 0 && (
+        <ConvocatoriaPanel
+          matchId={id}
+          players={allPlayers}
+          convocatorias={match.convocatorias.map(c => ({
+            playerId: c.playerId,
+            status: c.status,
+            note: c.note,
+          }))}
+        />
       )}
 
       {/* Analysis — admin only */}
