@@ -258,24 +258,27 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      {/* Match by match — with contextual ratings */}
+      {/* Match by match — full stats */}
       <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
         <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-          <h2 className="font-semibold text-white">Partidos</h2>
+          <h2 className="font-semibold text-white">Partidos — estadísticas detalladas</h2>
           {avgRating > 0 && (
-            <span className="text-xs text-slate-400">Media temporada: <span className={`font-bold ${ratingColor(avgRating)}`}>{avgRating}</span></span>
+            <span className="text-xs text-slate-400">Media: <span className={`font-bold ${ratingColor(avgRating)}`}>{avgRating}</span></span>
           )}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
-              <tr className="border-b border-slate-800">
-                <th className="text-left text-slate-400 font-medium px-4 py-2">Rival</th>
+              <tr className="border-b border-slate-800 bg-slate-800/40">
+                <th className="text-left text-slate-400 font-medium px-4 py-2 sticky left-0 bg-slate-800/40">Rival</th>
                 <th className="text-center text-slate-400 font-medium px-2 py-2">Val.</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2">vs media</th>
                 <th className="text-center text-slate-400 font-medium px-2 py-2">Min</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2">Pases%</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2">Tiros%</th>
+                <th className="text-center text-slate-400 font-medium px-2 py-2 whitespace-nowrap">Pases OK/T</th>
+                <th className="text-center text-slate-400 font-medium px-2 py-2 whitespace-nowrap">Tiros OK/T</th>
+                <th className="text-center text-slate-400 font-medium px-2 py-2 whitespace-nowrap">Reg OK/T</th>
+                <th className="text-center text-slate-400 font-medium px-2 py-2 whitespace-nowrap">Duelos OK/T</th>
+                <th className="text-center text-slate-400 font-medium px-2 py-2 whitespace-nowrap">Rec OK/T</th>
+                <th className="text-center text-slate-400 font-medium px-2 py-2">Pérd</th>
                 <th className="text-center text-slate-400 font-medium px-2 py-2">⚽</th>
                 <th className="text-center text-slate-400 font-medium px-2 py-2">🎯</th>
               </tr>
@@ -284,38 +287,51 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
               {player.matchStats.map((s, i) => {
                 const r = matchRatings[i]
                 const trend = trendIndicator(r, avgRating)
+
+                function statCell(ok: number, fail: number) {
+                  const total = ok + fail
+                  const p = pct(ok, fail)
+                  if (total === 0) return <span className="text-slate-600">—</span>
+                  return (
+                    <span className={p !== null && p >= 70 ? 'text-emerald-400' : p !== null && p >= 50 ? 'text-yellow-400' : 'text-red-400'}>
+                      {ok}/{total}
+                    </span>
+                  )
+                }
+
                 return (
                   <tr key={s.id} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="px-4 py-3">
-                      <Link href={`/partidos/${s.matchId}`} className="text-white hover:text-emerald-400 transition-colors">
-                        {s.match.rival}
-                      </Link>
+                    <td className="px-4 py-2.5 sticky left-0 bg-slate-900">
+                      <div>
+                        <Link href={`/partidos/${s.matchId}`} className="text-white hover:text-emerald-400 transition-colors font-medium">
+                          {s.match.rival}
+                        </Link>
+                        {trend && (
+                          <span className={`ml-2 text-xs ${trend.color}`}>{trend.label}</span>
+                        )}
+                      </div>
+                      <p className="text-slate-500 text-xs">
+                        {new Date(s.match.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                      </p>
                     </td>
-                    <td className={`px-2 py-3 text-center font-bold ${r > 0 ? ratingColor(r) : 'text-slate-500'}`}>
+                    <td className={`px-2 py-2.5 text-center font-bold ${r > 0 ? ratingColor(r) : 'text-slate-500'}`}>
                       {r > 0 ? r : '—'}
                     </td>
-                    <td className="px-2 py-3 text-center">
-                      {trend ? (
-                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${trend.color}`}>
-                          {trend.label}
-                        </span>
-                      ) : <span className="text-slate-600">—</span>}
-                    </td>
-                    <td className="px-2 py-3 text-center text-slate-300">{s.minutes || '—'}</td>
-                    <td className="px-2 py-3 text-center text-slate-300">
-                      {pct(s.passesOk, s.passesFail) !== null ? `${pct(s.passesOk, s.passesFail)}%` : '—'}
-                    </td>
-                    <td className="px-2 py-3 text-center text-slate-300">
-                      {pct(s.shotsOk, s.shotsFail) !== null ? `${pct(s.shotsOk, s.shotsFail)}%` : '—'}
-                    </td>
-                    <td className="px-2 py-3 text-center text-emerald-400 font-medium">{s.goals || '—'}</td>
-                    <td className="px-2 py-3 text-center text-yellow-400">{s.assists || '—'}</td>
+                    <td className="px-2 py-2.5 text-center text-slate-300">{s.minutes || '—'}</td>
+                    <td className="px-2 py-2.5 text-center font-medium">{statCell(s.passesOk, s.passesFail)}</td>
+                    <td className="px-2 py-2.5 text-center font-medium">{statCell(s.shotsOk, s.shotsFail)}</td>
+                    <td className="px-2 py-2.5 text-center font-medium">{statCell(s.dribblesOk, s.dribblesFail)}</td>
+                    <td className="px-2 py-2.5 text-center font-medium">{statCell(s.duelsOk, s.duelsFail)}</td>
+                    <td className="px-2 py-2.5 text-center font-medium">{statCell(s.recovOk, s.recovFail)}</td>
+                    <td className="px-2 py-2.5 text-center text-slate-300 font-medium">{s.losses > 0 ? s.losses : '—'}</td>
+                    <td className="px-2 py-2.5 text-center text-emerald-400 font-medium">{s.goals > 0 ? s.goals : '—'}</td>
+                    <td className="px-2 py-2.5 text-center text-yellow-400 font-medium">{s.assists > 0 ? s.assists : '—'}</td>
                   </tr>
                 )
               })}
               {player.matchStats.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">Sin datos de partidos</td>
+                  <td colSpan={11} className="px-4 py-8 text-center text-slate-500">Sin datos de partidos</td>
                 </tr>
               )}
             </tbody>
