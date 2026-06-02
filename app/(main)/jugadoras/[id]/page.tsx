@@ -262,84 +262,50 @@ export default async function JugadoraPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      {/* Match by match — full stats */}
+      {/* Partidos — resumen simple */}
       <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
         <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-          <h2 className="font-semibold text-white">Partidos — estadísticas detalladas</h2>
-          {avgRating > 0 && (
-            <span className="text-xs text-slate-400">Media: <span className={`font-bold ${ratingColor(avgRating)}`}>{avgRating}</span></span>
-          )}
+          <h2 className="font-semibold text-white">Partidos</h2>
+          <div className="flex items-center gap-3">
+            {avgRating > 0 && (
+              <span className="text-xs text-slate-400">Media: <span className={`font-bold ${ratingColor(avgRating)}`}>{avgRating}</span></span>
+            )}
+            <Link href={`/estadisticas?jugadora=${player.id}`}
+              className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1">
+              Ver stats detalladas →
+            </Link>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[900px]">
-            <thead>
-              <tr className="border-b border-slate-800 bg-slate-800/40">
-                <th className="text-left text-slate-400 font-medium px-4 py-2 sticky left-0 bg-slate-800/40">Rival</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2">Val.</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2">Min</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2 whitespace-nowrap">Pases OK/T</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2 whitespace-nowrap">Tiros OK/T</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2 whitespace-nowrap">Reg OK/T</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2 whitespace-nowrap">Duelos OK/T</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2 whitespace-nowrap">Rec OK/T</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2">Pérd</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2">⚽</th>
-                <th className="text-center text-slate-400 font-medium px-2 py-2">🎯</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {player.matchStats.map((s, i) => {
-                const r = matchRatings[i]
-                const trend = trendIndicator(r, avgRating)
-
-                function statCell(ok: number, fail: number) {
-                  const total = ok + fail
-                  const p = pct(ok, fail)
-                  if (total === 0) return <span className="text-slate-600">—</span>
-                  return (
-                    <span className={p !== null && p >= 70 ? 'text-emerald-400' : p !== null && p >= 50 ? 'text-yellow-400' : 'text-red-400'}>
-                      {ok}/{total}
-                    </span>
-                  )
-                }
-
-                return (
-                  <tr key={s.id} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="px-4 py-2.5 sticky left-0 bg-slate-900">
-                      <div>
-                        <Link href={`/partidos/${s.matchId}`} className="text-white hover:text-emerald-400 transition-colors font-medium">
-                          {s.match.rival}
-                        </Link>
-                        {trend && (
-                          <span className={`ml-2 text-xs ${trend.color}`}>{trend.label}</span>
-                        )}
-                      </div>
-                      <p className="text-slate-500 text-xs">
-                        {new Date(s.match.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
-                      </p>
-                    </td>
-                    <td className={`px-2 py-2.5 text-center font-bold ${r > 0 ? ratingColor(r) : 'text-slate-500'}`}>
-                      {r > 0 ? r : '—'}
-                    </td>
-                    <td className="px-2 py-2.5 text-center text-slate-300">{s.minutes || '—'}</td>
-                    <td className="px-2 py-2.5 text-center font-medium">{statCell(s.passesOk, s.passesFail)}</td>
-                    <td className="px-2 py-2.5 text-center font-medium">{statCell(s.shotsOk, s.shotsFail)}</td>
-                    <td className="px-2 py-2.5 text-center font-medium">{statCell(s.dribblesOk, s.dribblesFail)}</td>
-                    <td className="px-2 py-2.5 text-center font-medium">{statCell(s.duelsOk, s.duelsFail)}</td>
-                    <td className="px-2 py-2.5 text-center font-medium">{statCell(s.recovOk, s.recovFail)}</td>
-                    <td className="px-2 py-2.5 text-center text-slate-300 font-medium">{s.losses > 0 ? s.losses : '—'}</td>
-                    <td className="px-2 py-2.5 text-center text-emerald-400 font-medium">{s.goals > 0 ? s.goals : '—'}</td>
-                    <td className="px-2 py-2.5 text-center text-yellow-400 font-medium">{s.assists > 0 ? s.assists : '—'}</td>
-                  </tr>
-                )
-              })}
-              {player.matchStats.length === 0 && (
-                <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-slate-500">Sin datos de partidos</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="divide-y divide-slate-800">
+          {player.matchStats.map((s, i) => {
+            const r = matchRatings[i]
+            const trend = trendIndicator(r, avgRating)
+            return (
+              <Link key={s.id} href={`/partidos/${s.matchId}`}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-slate-800/50 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white text-sm font-medium">vs {s.match.rival}</span>
+                    {trend && <span className={`text-xs ${trend.color}`}>{trend.label}</span>}
+                  </div>
+                  <p className="text-slate-500 text-xs mt-0.5">
+                    {new Date(s.match.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 text-sm flex-shrink-0">
+                  {s.goals > 0 && <span className="text-emerald-400">⚽ {s.goals}</span>}
+                  {s.assists > 0 && <span className="text-yellow-400">🎯 {s.assists}</span>}
+                  <span className="text-slate-500">{s.minutes} min</span>
+                  <span className={`font-bold w-8 text-right ${r > 0 ? ratingColor(r) : 'text-slate-600'}`}>
+                    {r > 0 ? r : '—'}
+                  </span>
+                </div>
+              </Link>
+            )
+          })}
+          {player.matchStats.length === 0 && (
+            <p className="px-4 py-8 text-center text-slate-500 text-sm">Sin datos de partidos</p>
+          )}
         </div>
       </div>
 
