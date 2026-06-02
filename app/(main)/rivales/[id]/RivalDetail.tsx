@@ -1,8 +1,8 @@
 'use client'
-import { useActionState, useState, useRef } from 'react'
-import { updateRivalSwot, deleteRival } from '@/app/actions/rivales'
+import { useActionState, useState } from 'react'
+import { updateRivalSwot, deleteRival, updateRivalVideo } from '@/app/actions/rivales'
 import { useRouter } from 'next/navigation'
-import { TrendingUp, TrendingDown, Shield, AlertTriangle, Brain, Trash2, Save } from 'lucide-react'
+import { TrendingUp, TrendingDown, Shield, AlertTriangle, Brain, Trash2, Save, Video, BookOpen, ExternalLink } from 'lucide-react'
 
 type Rival = {
   id: string
@@ -14,6 +14,9 @@ type Rival = {
   threats: string | null
   notes: string | null
   aiAnalysis: string | null
+  videoUrl: string | null
+  videoNotes: string | null
+  observationGuide: string | null
 }
 
 const SWOT_FIELDS = [
@@ -30,37 +33,56 @@ const colorMap = {
   yellow: 'border-yellow-500/30 bg-yellow-500/5 text-yellow-400',
 }
 
+async function streamFrom(url: string, body: object, onChunk: (t: string) => void, onError: (msg: string) => void) {
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (!res.ok) throw new Error()
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+    let done = false
+    while (!done) {
+      const { value, done: d } = await reader.read()
+      done = d
+      if (value) onChunk(decoder.decode(value))
+    }
+  } catch {
+    onError('Error al conectar con la IA. Comprueba la API key de Anthropic.')
+  }
+}
+
 export default function RivalDetail({ rival }: { rival: Rival }) {
   const router = useRouter()
   const [swotState, swotAction, swotPending] = useActionState(updateRivalSwot, undefined)
+  const [videoState, videoAction, videoPending] = useActionState(updateRivalVideo, undefined)
   const [deleteState, deleteAction, deletePending] = useActionState(deleteRival, undefined)
   const [aiText, setAiText] = useState(rival.aiAnalysis ?? '')
   const [aiLoading, setAiLoading] = useState(false)
+  const [guideText, setGuideText] = useState(rival.observationGuide ?? '')
+  const [guideLoading, setGuideLoading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+
+  async function generateGuide() {
+    setGuideLoading(true)
+    setGuideText('')
+    await streamFrom(
+      '/api/rival-guide',
+      { rivalId: rival.id },
+      t => setGuideText(prev => prev + t),
+      msg => setGuideText(msg)
+    )
+    setGuideLoading(false)
+  }
 
   async function generateAI() {
     setAiLoading(true)
     setAiText('')
-    try {
-      const res = await fetch('/api/rival-ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rivalId: rival.id }),
-      })
-      if (!res.ok) throw new Error('Error generando análisis')
-      const reader = res.body!.getReader()
-      const decoder = new TextDecoder()
-      let done = false
-      while (!done) {
-        const { value, done: d } = await reader.read()
-        done = d
-        if (value) setAiText(prev => prev + decoder.decode(value))
-      }
-    } catch {
-      setAiText('Error al generar el análisis. Comprueba que tienes configurada la API key de Anthropic.')
-    } finally {
-      setAiLoading(false)
-    }
+    await streamFrom(
+      '/api/rival-ai',
+      { rivalId: rival.id },
+      t => setAiText(prev => prev + t),
+      msg => setAiText(msg)
+    )
+    setAiLoading(false)
   }
 
   return (
@@ -136,6 +158,82 @@ export default function RivalDetail({ rival }: { rival: Rival }) {
           <Save size={15} /> {swotPending ? 'Guardando...' : 'Guardar DAFO'}
         </button>
       </form>
+
+      {/* Video Analysis Section */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Video size={18} className="text-blue-400" />
+          <h2 className="font-semibold text-white">Análisis por vídeo</h2>
+        </div>
+
+        {/* Video URL + notes form */}
+        <form action={videoAction} className="space-y-3">
+          <input type="hidden" name="id" value={rival.id} />
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">URL del vídeo del rival (Veo, YouTube, etc.)</label>
+            <div className="flex gap-2">
+              <input
+                name="videoUrl"
+                defaultValue={rival.videoUrl ?? ''}
+                placeholder="https://veo.co/... o youtube.com/..."
+                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+              />
+              {rival.videoUrl && (
+                <a href={rival.videoUrl} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 px-3 py-2 rounded-lg text-sm transition-colors">
+                  <ExternalLink size={14} /> Ver
+                </a>
+              )}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">Notas de observación del vídeo</label>
+            <textarea
+              name="videoNotes"
+              defaultValue={rival.videoNotes ?? ''}
+              rows={4}
+              placeholder="Anota aquí lo que observes en el vídeo mientras lo ves (usa la guía de abajo como referencia)..."
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm resize-none focus:outline-none focus:border-blue-500"
+            />
+          </div>
+          {videoState?.error && <p className="text-red-400 text-sm">{videoState.error}</p>}
+          {videoState?.success && <p className="text-emerald-400 text-sm">Guardado</p>}
+          <button type="submit" disabled={videoPending}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <Save size={14} /> {videoPending ? 'Guardando...' : 'Guardar vídeo y notas'}
+          </button>
+        </form>
+
+        {/* Observation guide */}
+        <div className="border-t border-slate-800 pt-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BookOpen size={15} className="text-emerald-400" />
+              <span className="text-sm font-medium text-white">Guía de observación táctica</span>
+            </div>
+            <button
+              onClick={generateGuide}
+              disabled={guideLoading}
+              className="flex items-center gap-2 bg-emerald-600/20 hover:bg-emerald-600/30 disabled:opacity-50 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            >
+              <BookOpen size={13} />
+              {guideLoading ? 'Generando guía...' : guideText ? 'Regenerar guía' : 'Generar guía de observación'}
+            </button>
+          </div>
+
+          {guideText ? (
+            <div className="bg-slate-800/50 rounded-xl p-4 text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto">
+              {guideText}
+            </div>
+          ) : (
+            <p className="text-slate-500 text-sm italic">
+              {guideLoading
+                ? 'VAYNEX está generando la guía táctica...'
+                : 'Pulsa "Generar guía" para obtener preguntas y aspectos concretos a observar mientras ves el vídeo del rival.'}
+            </p>
+          )}
+        </div>
+      </div>
 
       {/* AI Analysis */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">

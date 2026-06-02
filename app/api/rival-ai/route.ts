@@ -26,7 +26,9 @@ ANÁLISIS DAFO:
 • Debilidades: ${rival.weaknesses || 'no especificado'}
 • Oportunidades: ${rival.opportunities || 'no especificado'}
 • Amenazas: ${rival.threats || 'no especificado'}
-• Notas adicionales: ${rival.notes || 'ninguna'}
+• Notas del cuerpo técnico: ${rival.notes || 'ninguna'}
+${rival.videoNotes ? `\nOBSERVACIONES DEL VÍDEO (anotadas por el cuerpo técnico):\n${rival.videoNotes}` : ''}
+${rival.videoTranscription ? `\nTRANSCRIPCIÓN DEL VÍDEO:\n${rival.videoTranscription}` : ''}
 
 Proporciona:
 1. **Análisis táctico** del rival (sistema de juego, patrones, amenazas principales)

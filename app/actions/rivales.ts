@@ -32,6 +32,19 @@ export async function updateRivalSwot(
   return { success: true }
 }
 
+export async function updateRivalVideo(
+  state: { error?: string; success?: boolean } | undefined,
+  formData: FormData
+): Promise<{ error?: string; success?: boolean }> {
+  await verifyAdmin()
+  const id = formData.get('id') as string
+  const videoUrl = (formData.get('videoUrl') as string)?.trim() || null
+  const videoNotes = (formData.get('videoNotes') as string)?.trim() || null
+  await prisma.rival.update({ where: { id }, data: { videoUrl, videoNotes } })
+  revalidatePath(`/rivales/${id}`)
+  return { success: true }
+}
+
 export async function deleteRival(
   state: { error?: string; success?: boolean } | undefined,
   formData: FormData

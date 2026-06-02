@@ -26,6 +26,9 @@ export default async function RivalPage({ params }: { params: Promise<{ id: stri
           threats: rival.threats,
           notes: rival.notes,
           aiAnalysis: rival.aiAnalysis,
+          videoUrl: rival.videoUrl,
+          videoNotes: rival.videoNotes,
+          observationGuide: rival.observationGuide,
         }}
       />
     </div>
