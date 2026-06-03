@@ -39,11 +39,13 @@ model Match {
   result    String?
   isHome    Boolean  @default(true)
   veoUrl    String?
+  rivalId   String?
   createdAt DateTime @default(now())
 
   playerStats   PlayerMatchStats[]
   analysis      MatchAnalysis?
   convocatorias Convocatoria[]
+  rivalProfile  Rival?            @relation(fields: [rivalId], references: [id], onDelete: SetNull)
 }
 
 model PlayerMatchStats {
@@ -145,10 +147,11 @@ model Rival {
   aiAnalysis          String?
   videoUrl            String?
   videoNotes          String?
-  videoTranscription  String?  // reservado para transcripción automática futura
+  videoTranscription  String?
   observationGuide    String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+  matches             Match[]
 }
 
 model Exercise {

@@ -3,14 +3,16 @@ import { verifySession } from '@/lib/dal'
 import { calcRating, ratingColor, pct } from '@/lib/stats'
 import Link from 'next/link'
 import { Trophy, Star, Clock, Target, Shield, TrendingUp, ChevronRight } from 'lucide-react'
+import CompareRadarChart from '@/components/CompareRadarChart'
+import ExportButton from '@/components/ExportButton'
 
 export default async function EstadisticasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ jugadora?: string }>
+  searchParams: Promise<{ jugadora?: string; comparar?: string }>
 }) {
   await verifySession()
-  const { jugadora: selectedId } = await searchParams
+  const { jugadora: selectedId, comparar: compareId } = await searchParams
 
   const [players, allStats, totalMatches] = await Promise.all([
     prisma.user.findMany({ where: { active: true, role: 'PLAYER' }, select: { id: true, name: true, position: true }, orderBy: { name: 'asc' } }),
@@ -52,8 +54,33 @@ export default async function EstadisticasPage({
     { id: 'recov',   label: 'Mejor % recuperaciones',   icon: Shield,    color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/20',  data: [...playerData].filter(p=>p.recovAcc!==null&&p.matches>=3).sort((a,b)=>(b.recovAcc??0)-(a.recovAcc??0)).slice(0,8), getValue:(p:any)=>`${p.recovAcc}%`, getSecondary:(p:any)=>`${p.recovOk+p.recovFail} acciones` },
   ]
 
+  // ── Comparativa ──
+  function buildTotals(stats: typeof allStats) {
+    return stats.reduce(
+      (acc, s) => ({ passesOk: acc.passesOk+s.passesOk, passesFail: acc.passesFail+s.passesFail, shotsOk: acc.shotsOk+s.shotsOk, shotsFail: acc.shotsFail+s.shotsFail, dribblesOk: acc.dribblesOk+s.dribblesOk, dribblesFail: acc.dribblesFail+s.dribblesFail, duelsOk: acc.duelsOk+s.duelsOk, duelsFail: acc.duelsFail+s.duelsFail, recovOk: acc.recovOk+s.recovOk, recovFail: acc.recovFail+s.recovFail }),
+      { passesOk:0, passesFail:0, shotsOk:0, shotsFail:0, dribblesOk:0, dribblesFail:0, duelsOk:0, duelsFail:0, recovOk:0, recovFail:0 }
+    )
+  }
+  const comparePlayerA = compareId ? players.find(p => p.id === compareId) : null
+  const comparePlayerB = selectedId && compareId ? players.find(p => p.id === selectedId) : null
+  const compareStatsA = compareId ? buildTotals(allStats.filter(s => s.playerId === compareId)) : null
+  const compareStatsB = selectedId && compareId ? buildTotals(allStats.filter(s => s.playerId === selectedId)) : null
+
+  // ── Export data ──
+  const exportData = playerData.map((p: any) => ({
+    'Jugadora': p.name,
+    'Posición': p.position ?? '',
+    'Partidos': p.matches,
+    'Goles': p.goals,
+    'Asistencias': p.assists,
+    'Minutos': p.minutes,
+    'Valoración': p.rating,
+    '% Pases': p.passAcc ?? '',
+    '% Recuper.': p.recovAcc ?? '',
+  }))
+
   // ── Per-player detailed match stats ──
-  const selectedPlayer = selectedId ? players.find(p => p.id === selectedId) : null
+  const selectedPlayer = selectedId && !compareId ? players.find(p => p.id === selectedId) : null
   const selectedMatchStats = selectedId
     ? await prisma.playerMatchStats.findMany({
         where: { playerId: selectedId, half: 'total' },
@@ -77,9 +104,12 @@ export default async function EstadisticasPage({
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Estadísticas de Temporada</h1>
-        <p className="text-slate-400 text-sm mt-1">Rankings individuales · {totalMatches} partidos jugados</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Estadísticas de Temporada</h1>
+          <p className="text-slate-400 text-sm mt-1">Rankings individuales · {totalMatches} partidos jugados</p>
+        </div>
+        <ExportButton data={exportData} filename="estadisticas-temporada" />
       </div>
 
       {/* Season summary */}
@@ -136,6 +166,69 @@ export default async function EstadisticasPage({
           ))}
         </div>
       )}
+
+      {/* ── Comparativa de jugadoras ── */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+        <div className="p-4 border-b border-slate-800">
+          <span className="font-semibold text-white">Comparar jugadoras</span>
+        </div>
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Jugadora A (verde)</label>
+              <select
+                value={compareId ?? ''}
+                onChange={e => {
+                  const url = new URL(window.location.href)
+                  url.searchParams.set('comparar', e.target.value)
+                  window.location.href = url.toString()
+                }}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+              >
+                <option value="">Selecciona jugadora A</option>
+                {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Jugadora B (violeta)</label>
+              <select
+                value={(compareId && selectedId) ? selectedId : ''}
+                onChange={e => {
+                  const url = new URL(window.location.href)
+                  url.searchParams.set('jugadora', e.target.value)
+                  window.location.href = url.toString()
+                }}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+              >
+                <option value="">Selecciona jugadora B</option>
+                {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {compareStatsA && compareStatsB && comparePlayerA && comparePlayerB ? (
+            <div className="space-y-3">
+              <CompareRadarChart statsA={compareStatsA} nameA={comparePlayerA.name} statsB={compareStatsB} nameB={comparePlayerB.name} />
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                {[
+                  { label: 'Valoración', a: playerData.find((p:any)=>p.id===comparePlayerA.id)?.rating ?? 0, b: playerData.find((p:any)=>p.id===comparePlayerB.id)?.rating ?? 0 },
+                  { label: 'Goles', a: playerData.find((p:any)=>p.id===comparePlayerA.id)?.goals ?? 0, b: playerData.find((p:any)=>p.id===comparePlayerB.id)?.goals ?? 0 },
+                  { label: 'Asistencias', a: playerData.find((p:any)=>p.id===comparePlayerA.id)?.assists ?? 0, b: playerData.find((p:any)=>p.id===comparePlayerB.id)?.assists ?? 0 },
+                  { label: 'Minutos', a: playerData.find((p:any)=>p.id===comparePlayerA.id)?.minutes ?? 0, b: playerData.find((p:any)=>p.id===comparePlayerB.id)?.minutes ?? 0 },
+                ].map(({ label, a, b }) => (
+                  <div key={label} className="bg-slate-800 rounded-xl p-3 flex items-center gap-2">
+                    <span className={`font-bold ${a >= b ? 'text-emerald-400' : 'text-slate-400'}`}>{a}</span>
+                    <span className="flex-1 text-center text-slate-500 text-xs">{label}</span>
+                    <span className={`font-bold ${b > a ? 'text-violet-400' : 'text-slate-400'}`}>{b}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-slate-500 text-sm text-center py-4">Selecciona dos jugadoras para comparar su radar de rendimiento</p>
+          )}
+        </div>
+      </div>
 
       {/* ── Detalle partido a partido ── */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">

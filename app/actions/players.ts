@@ -2,7 +2,38 @@
 import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
-import { verifyAdmin } from '@/lib/dal'
+import { verifyAdmin, verifySession } from '@/lib/dal'
+
+export async function updateProfile(
+  state: { error?: string; success?: boolean } | undefined,
+  formData: FormData
+): Promise<{ error?: string; success?: boolean }> {
+  const session = await verifySession()
+  const name = (formData.get('name') as string)?.trim()
+  if (!name) return { error: 'El nombre es obligatorio' }
+  await prisma.user.update({ where: { id: session.userId }, data: { name } })
+  revalidatePath('/perfil')
+  return { success: true }
+}
+
+export async function changePassword(
+  state: { error?: string; success?: boolean } | undefined,
+  formData: FormData
+): Promise<{ error?: string; success?: boolean }> {
+  const session = await verifySession()
+  const current = formData.get('current') as string
+  const newPass = formData.get('new') as string
+  const confirm = formData.get('confirm') as string
+  if (!current || !newPass || newPass.length < 6) return { error: 'La nueva contraseña debe tener al menos 6 caracteres' }
+  if (newPass !== confirm) return { error: 'Las contraseñas no coinciden' }
+  const user = await prisma.user.findUnique({ where: { id: session.userId } })
+  if (!user) return { error: 'Usuario no encontrado' }
+  const valid = await bcrypt.compare(current, user.password)
+  if (!valid) return { error: 'La contraseña actual no es correcta' }
+  const hashed = await bcrypt.hash(newPass, 10)
+  await prisma.user.update({ where: { id: session.userId }, data: { password: hashed } })
+  return { success: true }
+}
 
 export async function addPlayer(
   state: { error?: string; success?: boolean } | undefined,

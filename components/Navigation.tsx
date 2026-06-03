@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react'
 import {
   LayoutDashboard, Users, Trophy, Settings, LogOut, Calendar,
   Bot, Target, Dumbbell, BookOpen, BarChart2, Bell, Euro,
-  ChevronDown, MoreHorizontal, X, Wrench,
+  ChevronDown, MoreHorizontal, X, Wrench, UserCircle, ClipboardCheck,
 } from 'lucide-react'
 import { logout } from '@/app/actions/auth'
 
@@ -19,18 +19,23 @@ const mainLinks = [
 ]
 
 const adminLinks = [
-  { href: '/vaynex',         label: 'VAYNEX',       icon: Bot,      vaynex: true },
-  { href: '/rivales',        label: 'Rivales',      icon: Target },
-  { href: '/entrenamientos', label: 'Entrenos',     icon: Dumbbell },
-  { href: '/ejercicios',     label: 'Ejercicios',   icon: BookOpen },
-  { href: '/admin/multas',   label: 'Multas',       icon: Euro },
-  { href: '/admin',          label: 'Admin',        icon: Settings },
+  { href: '/vaynex',              label: 'VAYNEX',       icon: Bot,            vaynex: true },
+  { href: '/rivales',             label: 'Rivales',      icon: Target },
+  { href: '/entrenamientos',      label: 'Entrenos',     icon: Dumbbell },
+  { href: '/ejercicios',          label: 'Ejercicios',   icon: BookOpen },
+  { href: '/admin/multas',        label: 'Multas',       icon: Euro },
+  { href: '/admin/asistencia',    label: 'Asistencia',   icon: ClipboardCheck },
+  { href: '/admin',               label: 'Admin',        icon: Settings },
+]
+
+const userLinks = [
+  { href: '/perfil', label: 'Mi perfil', icon: UserCircle },
 ]
 
 // Mobile: show only the 4 most important + "Más"
 const mobileMain = mainLinks.slice(0, 4)
 
-export default function Navigation({ role }: { role: string }) {
+export default function Navigation({ role, urgentNoticeCount = 0 }: { role: string; urgentNoticeCount?: number }) {
   const pathname = usePathname()
   const isAdmin = role === 'ADMIN' || role === 'COACH'
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -65,16 +70,30 @@ export default function Navigation({ role }: { role: string }) {
         <nav className="flex items-center gap-1 flex-1 flex-wrap">
           {mainLinks.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+            const isAvisos = href === '/avisos'
             return (
               <Link key={href} href={href}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                   active ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'
                 }`}>
                 <Icon size={15} />
                 {label}
+                {isAvisos && urgentNoticeCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                    {urgentNoticeCount}
+                  </span>
+                )}
               </Link>
             )
           })}
+          {/* Perfil link */}
+          <Link href="/perfil"
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+              pathname === '/perfil' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}>
+            <UserCircle size={15} />
+            Perfil
+          </Link>
 
           {/* Admin tools dropdown */}
           {isAdmin && (

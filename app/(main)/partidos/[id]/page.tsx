@@ -32,6 +32,14 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
 
   if (!match) notFound()
 
+  // Top and bottom performers
+  const ratedPlayers = match.playerStats
+    .map(s => ({ ...s, r: calcRating(s) }))
+    .filter(s => s.r > 0)
+    .sort((a, b) => b.r - a.r)
+  const top3 = ratedPlayers.slice(0, 3)
+  const bottom3 = ratedPlayers.length >= 5 ? ratedPlayers.slice(-3).reverse() : []
+
   const teamTotals = match.playerStats.reduce(
     (acc, s) => ({
       passesOk: acc.passesOk + s.passesOk,
@@ -182,6 +190,43 @@ export default async function PartidoPage({ params }: { params: Promise<{ id: st
           </table>
         </div>
       </div>
+
+      {/* Top & Bottom performers */}
+      {top3.length >= 3 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-slate-900 border border-emerald-500/20 rounded-2xl p-4">
+            <h3 className="text-sm font-semibold text-emerald-400 mb-3">🏅 Mejores del partido</h3>
+            <div className="space-y-2">
+              {top3.map((s, i) => (
+                <div key={s.id} className="flex items-center gap-3">
+                  <span className="text-slate-500 text-xs w-4">{i + 1}</span>
+                  <Link href={`/jugadoras/${s.playerId}`} className="flex-1 text-white text-sm hover:text-emerald-400 transition-colors truncate">
+                    {s.player.name}
+                  </Link>
+                  {s.goals > 0 && <span className="text-emerald-400 text-xs">⚽{s.goals}</span>}
+                  <span className={`font-bold text-sm ${ratingColor(s.r)}`}>{s.r}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {bottom3.length >= 3 && (
+            <div className="bg-slate-900 border border-red-500/20 rounded-2xl p-4">
+              <h3 className="text-sm font-semibold text-red-400 mb-3">📉 Margen de mejora</h3>
+              <div className="space-y-2">
+                {bottom3.map((s, i) => (
+                  <div key={s.id} className="flex items-center gap-3">
+                    <span className="text-slate-500 text-xs w-4">{ratedPlayers.length - i}</span>
+                    <Link href={`/jugadoras/${s.playerId}`} className="flex-1 text-white text-sm hover:text-emerald-400 transition-colors truncate">
+                      {s.player.name}
+                    </Link>
+                    <span className={`font-bold text-sm ${ratingColor(s.r)}`}>{s.r}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Pitch lineup */}
       {match.playerStats.length > 0 && (

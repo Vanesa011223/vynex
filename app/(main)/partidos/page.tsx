@@ -3,13 +3,27 @@ import { verifySession } from '@/lib/dal'
 import { parseResult, resultConfig } from '@/lib/stats'
 import Link from 'next/link'
 
-export default async function PartidosPage() {
-  const session = await verifySession()
+const PAGE_SIZE = 15
 
-  const matches = await prisma.match.findMany({
-    orderBy: { date: 'desc' },
-    include: { _count: { select: { playerStats: { where: { half: 'total' } } } } },
-  })
+export default async function PartidosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}) {
+  const session = await verifySession()
+  const { page } = await searchParams
+  const currentPage = Math.max(1, parseInt(page ?? '1'))
+
+  const [matches, total] = await Promise.all([
+    prisma.match.findMany({
+      orderBy: { date: 'desc' },
+      include: { _count: { select: { playerStats: { where: { half: 'total' } } } } },
+      skip: (currentPage - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.match.count(),
+  ])
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   const withGoals = await Promise.all(
     matches.map(async (m) => {
@@ -116,6 +130,25 @@ export default async function PartidosPage() {
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          {currentPage > 1 && (
+            <Link href={`/partidos?page=${currentPage - 1}`}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors">
+              ← Anterior
+            </Link>
+          )}
+          <span className="text-slate-500 text-sm">Página {currentPage} de {totalPages}</span>
+          {currentPage < totalPages && (
+            <Link href={`/partidos?page=${currentPage + 1}`}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors">
+              Siguiente →
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   )
 }

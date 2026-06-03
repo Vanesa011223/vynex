@@ -7,20 +7,31 @@ import { Trophy, TrendingUp, Calendar, ArrowRight, Star } from 'lucide-react'
 export default async function DashboardPage() {
   const session = await verifySession()
   const isAdmin = session.role === 'ADMIN' || session.role === 'COACH'
+  const isPlayer = session.role === 'PLAYER'
 
   const now = new Date()
 
-  const [matches, players, allStats, teamContext, nextEvents] = await Promise.all([
+  const [matches, players, allStats, teamContext, nextEvents, myPlayerData] = await Promise.all([
     prisma.match.findMany({ orderBy: { date: 'desc' }, take: 10 }),
     prisma.user.findMany({ where: { active: true, role: 'PLAYER' }, orderBy: { name: 'asc' } }),
     prisma.playerMatchStats.findMany({ where: { half: 'total' } }),
     prisma.teamContext.findUnique({ where: { id: 'singleton' } }),
-    prisma.calendarEvent.findMany({
-      where: { date: { gte: now } },
-      orderBy: { date: 'asc' },
-      take: 3,
-    }),
+    prisma.calendarEvent.findMany({ where: { date: { gte: now } }, orderBy: { date: 'asc' }, take: 3 }),
+    isPlayer ? prisma.user.findUnique({
+      where: { id: session.userId },
+      include: {
+        matchStats: { where: { half: 'total' }, include: { match: true }, orderBy: { match: { date: 'desc' } }, take: 10 },
+        injuries: { where: { endDate: null }, take: 1 },
+      },
+    }) : null,
   ])
+
+  // Player-specific: next convocatoria
+  const nextConvocatoria = isPlayer ? await prisma.convocatoria.findFirst({
+    where: { playerId: session.userId, match: { date: { gte: now } } },
+    include: { match: true },
+    orderBy: { match: { date: 'asc' } },
+  }) : null
 
   // W-D-L record
   const record = matches.reduce(
@@ -125,6 +136,75 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* ── PLAYER PERSONAL SECTION ── */}
+      {isPlayer && myPlayerData && (() => {
+        const myStats = myPlayerData.matchStats
+        const myTotals = myStats.reduce(
+          (acc, s) => ({ passesOk: acc.passesOk+s.passesOk, passesFail: acc.passesFail+s.passesFail, shotsOk: acc.shotsOk+s.shotsOk, shotsFail: acc.shotsFail+s.shotsFail, dribblesOk: acc.dribblesOk+s.dribblesOk, dribblesFail: acc.dribblesFail+s.dribblesFail, duelsOk: acc.duelsOk+s.duelsOk, duelsFail: acc.duelsFail+s.duelsFail, recovOk: acc.recovOk+s.recovOk, recovFail: acc.recovFail+s.recovFail, goals: acc.goals+s.goals, assists: acc.assists+s.assists, minutes: acc.minutes+s.minutes }),
+          { passesOk:0,passesFail:0,shotsOk:0,shotsFail:0,dribblesOk:0,dribblesFail:0,duelsOk:0,duelsFail:0,recovOk:0,recovFail:0,goals:0,assists:0,minutes:0 }
+        )
+        const myRating = calcRating(myTotals)
+        const last5 = myStats.slice(0,5).map(s => calcRating(s)).filter(r => r > 0)
+        const isInjured = myPlayerData.injuries.length > 0
+        const CONV_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+          convocada:    { label: '✓ Convocada',    color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30' },
+          no_convocada: { label: '✗ No convocada', color: 'text-slate-400',   bg: 'bg-slate-700/30 border-slate-600/30' },
+          lesionada:    { label: '⚠ Lesionada',    color: 'text-yellow-400',  bg: 'bg-yellow-500/10 border-yellow-500/30' },
+          sancionada:   { label: '✗ Sancionada',   color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/30' },
+        }
+        return (
+          <div className="bg-gradient-to-r from-emerald-500/10 to-slate-900 border border-emerald-500/20 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-emerald-500/20 flex items-center justify-center text-2xl font-bold text-emerald-400 flex-shrink-0">
+                {myPlayerData.name.charAt(0)}
+              </div>
+              <div className="flex-1">
+                <h2 className="text-white font-bold text-lg">{myPlayerData.name}</h2>
+                <p className="text-slate-400 text-sm">{myPlayerData.position ?? 'Jugadora'}</p>
+                {last5.length > 0 && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-xs text-slate-500">Forma:</span>
+                    {last5.map((r, i) => <div key={i} className={`w-2.5 h-2.5 rounded-full ${ratingBg(r)}`} />)}
+                  </div>
+                )}
+                {isInjured && <span className="text-xs text-red-400 mt-1 block">⚠ Lesionada actualmente</span>}
+              </div>
+              <div className="text-right">
+                <div className={`text-4xl font-black ${ratingColor(myRating)}`}>{myRating || '—'}</div>
+                <p className="text-slate-500 text-xs">Valoración</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'Goles', value: myTotals.goals },
+                { label: 'Asistencias', value: myTotals.assists },
+                { label: 'Minutos', value: myTotals.minutes },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-slate-900/60 rounded-xl p-2.5 text-center">
+                  <div className="text-white font-bold">{value}</div>
+                  <div className="text-slate-500 text-xs">{label}</div>
+                </div>
+              ))}
+            </div>
+            {nextConvocatoria && (() => {
+              const cfg = CONV_CONFIG[nextConvocatoria.status]
+              return (
+                <div className={`flex items-center justify-between rounded-xl p-3 border ${cfg?.bg ?? 'bg-slate-800 border-slate-700'}`}>
+                  <div>
+                    <p className="text-white text-sm font-medium">vs {nextConvocatoria.match.rival}</p>
+                    <p className="text-slate-500 text-xs">{new Date(nextConvocatoria.match.date).toLocaleDateString('es-ES', { weekday: 'long', day: '2-digit', month: 'long' })}</p>
+                  </div>
+                  <span className={`text-sm font-bold ${cfg?.color ?? 'text-slate-400'}`}>{cfg?.label ?? nextConvocatoria.status}</span>
+                </div>
+              )
+            })()}
+            <Link href={`/jugadoras/${myPlayerData.id}`} className="flex items-center gap-1 text-sm text-emerald-400 hover:text-emerald-300 transition-colors">
+              Ver mi ficha completa <ArrowRight size={14} />
+            </Link>
+          </div>
+        )
+      })()}
 
       {/* Week message */}
       {teamContext?.weekMessage && (
