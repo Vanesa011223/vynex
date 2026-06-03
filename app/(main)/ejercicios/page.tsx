@@ -4,7 +4,10 @@ import EjerciciosClient from './EjerciciosClient'
 
 export default async function EjerciciosPage() {
   await verifyAdmin()
-  const exercises = await prisma.exercise.findMany({ orderBy: [{ category: 'asc' }, { name: 'asc' }] })
+  const exercises = await prisma.exercise.findMany({
+    orderBy: [{ category: 'asc' }, { name: 'asc' }],
+    include: { _count: { select: { sessions: true } } },
+  })
   const serialized = exercises.map(e => ({
     id: e.id,
     name: e.name,
@@ -14,6 +17,7 @@ export default async function EjerciciosPage() {
     duration: e.duration,
     difficulty: e.difficulty,
     materials: e.materials,
+    sessionCount: e._count.sessions,
   }))
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">

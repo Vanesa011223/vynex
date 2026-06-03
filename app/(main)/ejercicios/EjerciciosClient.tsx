@@ -12,6 +12,7 @@ type Exercise = {
   duration: number | null
   difficulty: string | null
   materials: string | null
+  sessionCount?: number
 }
 
 const CATEGORIES = [
@@ -186,6 +187,9 @@ export default function EjerciciosClient({ exercises }: { exercises: Exercise[] 
                     <span className="flex items-center gap-1">
                       <Clock size={13} /> {e.duration}min
                     </span>
+                  )}
+                  {(e.sessionCount ?? 0) > 0 && (
+                    <span className="text-emerald-400/70 text-xs">✓ {e.sessionCount} sesión{(e.sessionCount ?? 0) !== 1 ? 'es' : ''}</span>
                   )}
                   {e.difficulty && (
                     <span className={DIFFICULTY_COLORS[e.difficulty] ?? ''}>{DIFFICULTY_LABELS[e.difficulty] ?? e.difficulty}</span>
